@@ -1,0 +1,23 @@
+.eordem_fieldset input[type='input'] {
+	width: 400px;
+}
+
+.eordem_fieldset input, .eordem_fieldset select {
+	width: 80px;
+}
+
+.eordem_fieldset table tbody th {
+	text-align: right;
+	vertical-align: middle;
+	padding-right: 1em;
+}
+
+.eordem_fieldset table tbody th label {
+	vertical-align: top;
+}
+
+#eordem_footer {
+	border-top: 1px solid grey;
+	margin-top: 2em;
+	padding-top: 1em;
+}
