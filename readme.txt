@@ -1,4 +1,4 @@
-=== eShop CSV Export ===
+=== eShop Order Emailer ===
 Contributors: paulswebsolutions
 Donate link: http://csv-imp.paulswebsolutions.com
 Tags: eshop, csv, orders, email, fulfillment
