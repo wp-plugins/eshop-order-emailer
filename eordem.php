@@ -2,209 +2,227 @@
 /*
 Plugin Name: eShop Order Emailer
 Plugin URI: http://www.paulswebsolutions.com
-Description: Email a CSV report of successful eShop orders each day.
-Version: 1.1
+Description: Automatically email eShop orders to your suppliers or a fulfillment center.
+Version: 2.0
 Author: Paul's Web Solutions
 Author URI: http://www.paulswebsolutions.com/
+
+	LICENSE
+
+	Copyright 2012  Paul's Web Solutions  (email : paul@paulswebsolutions.com )
+
+	This program is free software; you can redistribute it and/or modify
+	it under the terms of the GNU General Public License, version 2, as 
+	published by the Free Software Foundation.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program; if not, write to the Free Software
+	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-DEFINE( 'EORDEM_SETTINGS', '_eordem_settings' );
+# Init
 
-// Load classes/functions
-require_once( 'view.php' );
+$plugin_name = 'eordem';
 
-if ( !class_exists( 'eordem_controller' ) ) {
+# Load libraries
 
-	class eordem_controller {
+foreach( glob( dirname( __FILE__ ) . '/lib/*class.php' ) as $filename ) {
+	require_once( $filename );
+}
 
-		var $view;
-		var $settings;
-		var $fields;
+# Main class
 
-		function eordem_controller( ) {
+if ( !class_exists( $plugin_name ) ) {
 
-			$settings = array( // Defaults
-				'recipients' => '',
-				'hour_of_day' => '',
-				'fields' => array( )
+	class eordem extends pwsPlugin_1_0 {
+
+		public function __construct( $plugin_name ) {
+
+			$this->constants = Array(
+				'plugin_name' => $plugin_name,
+				'plugin_display_name' => 'eShop Order Emailer',
+				'plugin_menu_display_name' => 'Order Emailer',
+				'options_key' => "{$plugin_name}_plugin_options",
+				'plugin_folder' => dirname( __FILE__ ),
+				'plugin_url' => plugins_url( '', __FILE__ )
 			);
 
-			$this->fields = array( 'id', 'checkid', 'status', 'first_name', 'last_name', 'full_name', 'company', 'email', 'phone', 'address', 'address1', 'address2', 'city', 'state', 'zip', 'country', 'reference', 'transid', 'comments', 'thememo', 'edited', 'paidvia', 'order_items', 'before', 'after' );
+			$this->defaultOptions = Array(
+				'recipients' => get_bloginfo( 'admin_email' ),
+				'hour_of_day' => '0',
+				'summary_hour_of_day' => '0',
+				'csv_fields' => Array( ),
+				'use_supplier_email' => TRUE,
+				'frequency' => 'daily',
+				'summary_frequency' => 'daily',
+				'email_subject' => 'Orders From ' . get_bloginfo( 'name' )
 
-			add_option( EORDEM_SETTINGS, $settings ); // Does nothing if option already exists
+			);
 
-			if ( isset( $_POST['recipients'] ) && isset( $_POST['hour_of_day'] ) ) {
-				$this->settings['recipients'] = $_POST['recipients'];
-				$this->settings['hour_of_day'] = $_POST['hour_of_day'];
-				$this->settings['fields'] = $_POST['fields'];
-				$this->save_settings( $this->settings );
+			$this->controllerNames = Array(
+				'settings',
+				'credits'
+			);
+
+			$this->cronSchedules = Array(
+				'two_minutes' => Array( 'interval' => 120, 'display' => 'Every Two Minutes' ),
+				'two_hours' => Array( 'interval' => 7200, 'display' => 'Every Two Hours' ),
+				'four_hours' => Array( 'interval' => 28800, 'display' => 'Every Four Hours' )
+			);
+			parent::__construct( $plugin_name );
+		}
+
+		public function afterOptionsLoaded( ) {
+			$send_emails_timestamp = strtotime( date( 'Y-m-d' ) ) + $this->config['plugin_options']['hour_of_day'];
+			$daily_summary_timestamp = strtotime( date( 'Y-m-d' ) ) + $this->config['plugin_options']['summary_hour_of_day'];
+			$send_emails_frequency = $this->config['plugin_options']['frequency'];
+			$daily_summary_frequency = $this->config['plugin_options']['summary_frequency'];
+
+			$this->cronJobs = Array(
+				'notify_suppliers' => Array( 
+					'start' => $send_emails_timestamp, 
+					'frequency' => $send_emails_frequency, 
+					'callback' => Array( &$this, 'notify_suppliers' )
+		       		),
+				'daily_summary' => Array( 
+					'start' => $daily_summary_timestamp, 
+					'frequency' => $daily_summary_frequency, 
+					'callback' => Array( &$this, 'daily_summary' ) 
+				)
+			);
+
+			if ( isset( $_POST[$this->config['constants']['options_key']] ) ) {
+				add_action( 'wp_loaded', Array( $this, 'initCronJobs' ) );
 			}
-
-			$this->settings = get_option( EORDEM_SETTINGS );
-
-			// CST = 'America/Chicago' as required
-			//date_default_timezone_set( 'America/Chicago' );
-
-			if ( isset( $_POST['sendnow'] ) ) {
-				$this->send_email( );
-			} elseif ( isset( $_POST['reset'] ) ) {
-				$this->reset( );
-			} elseif ( isset( $_POST['recipients'] ) && isset( $_POST['hour_of_day'] ) ) {
-				wp_clear_scheduled_hook( 'eordem_send' );
-
-				$start_time = strtotime( date( 'd M Y' ) ) - (int)(get_option( 'gmt_offset' ) * 3600) + $this->settings['hour_of_day'] - 900;
-				wp_schedule_event( $start_time, 'daily', 'eordem_send' );
-			}
-
-
-
-			$this->view = new eordem_view( );
+			add_action( "{$plugin_name}_notify_suppliers", Array( $this, 'notify_suppliers' ) );
+			add_action( "{$plugin_name}_delete_all", Array( $this, 'delete_all' ) );
 
 		}
 
-		function setup( ) {
-			$f = $this->order_query();
-			$this->view->page( 'setup', array_merge( $this->settings, array( 'eshop_fields' => $this->fields, 'recent_orders' => $f ) ) );
-		}
-
-		function save_settings( $settings ) {
-			update_option( EORDEM_SETTINGS, $settings );
-		}
-
-		function menu( ) {
-			add_submenu_page( 'tools.php', 'eShop Emailer', 'eShop Emailer', 'administrator', 'eordem', array( $this, 'setup' ) );
-		}
-
-		function send_email( ) {
-			$attachment = $this->get_report( );
-			$success = $this->send_message( $this->settings['recipients'], get_bloginfo( 'admin_email' ), 'eShop Orders', 'A report of orders completed in the last 24 hours is attached.', $attachment );
-			if ( is_file( $attachment ) ) {
-				unlink( $attachment );
-			}
-		}
-
-		function reset( ) {
+		public function activate( ) {
 			global $wpdb;
-			$pws_orders_emailed_table = $wpdb->prefix . 'pws_eshop_orders_emailed';
-			$sql = $wpdb->prepare( "DELETE FROM $pws_orders_emailed_table" );
-			$wpdb->query( $sql );
+			$table_name = $wpdb->prefix . "pws_eordem";
+
+			if ( $wpdb->get_var( "show tables like '$table_name'" ) != $table_name ) {
+				$sql = 	"
+					CREATE TABLE `$table_name` (
+					id mediumint(9) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+					eshop_order_id int(11) NOT NULL,
+					post_id int(11) NOT NULL,
+					recipients text NOT NULL,
+					email_sent datetime NOT NULL
+					);
+					";
+				$wpdb->query( $sql );
+			}
+			$this->convertOldOptions( );
+			# Important to notify immediately on activation to populate the sent already table.  If we didn't do this
+			# then it would be possible for orders from years ago to be re-sent and potentially cause a lot of problems.
+			$this->notify_suppliers( TRUE );
 		}
 
-		function order_query( ) {
-			global $wpdb;
-			$orders_table = $wpdb->prefix . 'eshop_orders';
-			$order_items_table = $wpdb->prefix . 'eshop_order_items';
-			$pws_orders_emailed_table = $wpdb->prefix . 'pws_eshop_orders_emailed';
-			// This query checks the last two days for successful orders that have not yet been emailed via CSV (as recorded in 
-			// the pws_eshop_orders_emailed table
-			$sql = "SELECT o.*,oi.item_id, oi.item_qty, oi.optname, oi.weight, s.code FROM $orders_table o LEFT JOIN $order_items_table oi ON o.checkid = oi.checkid, wp_eshop_states s WHERE s.id = o.state AND o.id NOT IN (SELECT eshop_order_id FROM $pws_orders_emailed_table ) AND o.status = 'Completed'";
-// not needed for now: edited BETWEEN SYSDATE() - INTERVAL 2 DAY AND SYSDATE(),
-			$results = $wpdb->get_results( $sql, ARRAY_A );
+		private function convertOldOptions( ) {
+			define( 'OLD_OPTIONS_KEY', '_eordem_settings' );
 
-			foreach( $results as $r ) {
-				extract( $r );
-				if ( !isset( $data[$checkid] ) ) {
-					$r['full_name'] = "$first_name $last_name";
-					$r['state'] = $code;
-					$r['ship_postcode'] = $code;
-					$r['order_items'] = "$item_qty x $optname ($item_id)";
-					$r['address'] = empty($address2) ? $address1 : "$address1\n$address2";
-					foreach( $r as $k => $v ) {
-						if ( in_array( $k, $this->fields ) ) {
-							$data[$checkid][$k] = $v;
+			$old_options = get_option( OLD_OPTIONS_KEY );
+			$new_options = get_option( $this->constants['options_key'] );
+			if ( $old_options ) {
+				foreach( $old_options['fields'] as $field_name => $field_values ) {
+					extract( $field_values );
+					$field_name = ucwords( preg_replace( '/_/', ' ', $field_name ) );
+
+					if ( $checked == 'on' && $field_name != 'Before' && $field_name != 'After' ) {
+						$new_field_options[] = Array( 'name' => $field_name, 'text' => $display );
+					}
+					if ( $field_name == 'Before' && $checked == 'on' ) {
+						$custom_fields = explode( ',', $display );
+						foreach( $custom_fields as $cf ) {
+							$before_options[] = Array( 'name' => 'Custom', 'text' => $cf );
 						}
 					}
-				} else {
-					if ( $item_id != 'Shipping' ) {
-						$data[$checkid]['order_items'] .= "\n$item_qty x $optname ($item_id)";
-					}
-				}
-			}
-
-			$before = array( );
-			$after = array( );
-			if ( $data ) {
-				if ( !empty( $this->settings['fields']['before'] ) && isset($this->settings['fields']['before']['checked']) ) {
-					$temp = explode( ',', $this->settings['fields']['before']['display'] );
-					foreach( $temp as $t ) {
-						$keyval = explode( '=', $t );
-						$before[$keyval[0]] = $keyval[1];
-					}
-				}
-				if ( !empty( $this->settings['fields']['after'] ) && isset($this->settings['fields']['after']['checked']) ) {
-					$temp = explode( ',', $this->settings['fields']['after']['display'] );
-					foreach( $temp as $t ) {
-						$keyval = explode( '=', $t );
-						$after[$keyval[0]] = $keyval[1];
-					}
-				}
-				foreach( $data as $d ) {
-					foreach( $this->settings['fields'] as $k => $v ) {
-						if ( isset( $v['checked'] ) ) {
-							if ( $k != 'before' && $k != 'after' ) {
-								$display = empty( $v['display'] ) ? $k : $v['display'];
-								$middle[$display] = $d[$k];
-							}
+					if ( $field_name == 'After' && $checked == 'on' ) {
+						$custom_fields = explode( ',', $display );
+						foreach( $custom_fields as $cf ) {
+							$after_options[] = Array( 'name' => 'Custom', 'text' => $cf );
 						}
 					}
-					$processed[$d['id']] = array_merge( $before, $middle, $after );
 				}
-				return $processed;
-			}
-			return NULL;
+			}	
+
+			$new_options['csv_fields'] = array_merge( $before_options, $new_field_options, $after_options );
+
+			update_option( $this->constants['options_key'], $new_options );
+
+			delete_option( OLD_OPTIONS_KEY );
+
 		}
-
-
-		function get_report( ) {
-			global $wpdb;
-			$pws_orders_emailed_table = $wpdb->prefix . 'pws_eshop_orders_emailed';
-			$fullpath = '';
-			$results = $this->order_query( );
-
-			$fullpath = dirname( __FILE__ ) . '/eshop-orders.csv';
-			if ( is_file( $fullpath ) ) {
-				unlink( $fullpath );
+		
+		public function notify_suppliers( $send_to_admin_only = FALSE ) {
+			
+			$ordersModel = $this->getModel( 'orders' );
+			
+			$orders = $ordersModel->getNewOrders( );
+			$filtered = $ordersModel->filterFields( $orders );
+			if ( is_array( $filtered ) ) {
+				foreach( $filtered as $recipients => $customer ) {
+					$fulfillment_groups[$recipients] = $ordersModel->prepareCSV( $customer );
+				}
 			}
-			$fp = @fopen( $fullpath, 'w' );
-			if ( $fp ) {
-				if ( !empty( $results ) ) {
-					$first = true;
-					foreach ( $results as $k => $row ) {
-						if ( $first ) {
-							$fwrite = fputcsv( $fp, array_keys( $row ) );
-							$first = false;
-						}
-						$fwrite = fputcsv( $fp, array_values( $row ) );
-						$wpdb->insert( $pws_orders_emailed_table, array( 'eshop_order_id' => $k ) );
+			if ( !empty( $fulfillment_groups ) ) {
+				if ( $send_to_admin_only ) {
+					$combined = Array( );
+					foreach( $fulfillment_groups as $recipients => $orders ) {
+						$combined = array_merge( $combined, $orders );
 					}
-				} else {
-					$fwrite = fwrite( $fp, 'No orders' );
+					$fulfillment_groups = Array( 'admin_email' => $combined );
 				}
-				fclose( $fp );
+				$folder = dirname( WP_CONTENT_DIR ) . "/tmp";
+				if ( !file_exists( $folder ) ) mkdir( $folder );
+				$filepath = "$folder/attachment.csv";
+				$email_was_sent = FALSE;
+				foreach( $fulfillment_groups as $recipients => $fulfillment_group ) {
+					if ( !empty( $fulfillment_group ) && $this->createCSV( $fulfillment_group, $filepath ) ) {
+						if ( $recipients == 'admin_email' || $send_to_admin_only ) $recipients = $this->config['plugin_options']['recipients'];
+						$subject = $this->config['plugin_options']['email_subject'];
+						$this->sendEmail( 
+							$recipients, 
+							get_bloginfo( 'admin_email' ), 
+							$subject, 
+							'Orders file attached.', 
+							$filepath,
+							FALSE
+						);
+						$email_was_sent = TRUE;
+					}
+				}
+				if ( $email_was_sent ) $ordersModel->markSent( $orders );
+				if ( file_exists( $filepath ) ) unlink( $filepath );
 			}
-			return $fullpath;
 		}
 
-		function activation( ) {
-			$this->add_table( );
+		private function createCSV( $data, $filepath ) {
+
+			$csv = new pwsXSV( );
+			//error_log( print_r( $data, TRUE ) );
+			return $csv->save( $data, $filepath, TRUE, TRUE );
 		}
 
-		function deactivation( ) {
-			$timestamp = wp_next_scheduled( 'eordem_send' );
-			wp_unschedule_event( $timestamp, 'eordem_send' );
-			wp_clear_scheduled_hook( 'eordem_send' );
-		}
-
-		function send_message( $to, $from, $subject, $body, $attachment ) {
+		private function sendEmail( $to, $from, $subject, $body, $attachment, $send_to_log = FALSE ) {
 
 			require_once( WP_CONTENT_DIR . '/../wp-includes/class-phpmailer.php' );
-			$mail = new PHPMailer(false);
+			$mail = new PHPMailer( FALSE );
 
 			if ( preg_match( '/10\.1\.1\.3/', $_SERVER['SERVER_NAME'] ) ) {  // This is for dev testing only
 				$mail->IsSMTP();
 				$mail->Host = 'mail.internode.on.net';
 				$mail->SMTPAuth = false;
 			}
+			$subject = htmlspecialchars_decode( $subject );
 			$mail->Subject = $subject;
 			$mail->From = $from;
 			$mail->FromName = get_bloginfo( 'name' );
@@ -216,43 +234,39 @@ if ( !class_exists( 'eordem_controller' ) ) {
 			$mail->AltBody = "To view the message, please use an HTML compatible email viewer!"; // optional, comment out and test
 			$mail->CharSet = "utf-8";
 			$mail->MsgHTML($body);
-			$successful = $mail->Send();
+			if ( $send_to_log ) {
+				error_log( print_r( $to, TRUE ) );
+			} else {
+				$successful = $mail->Send();
+			}
 			return $successful;
 		}
 
-		function add_table( ) {
-			global $wpdb;
-			$table_name = $wpdb->prefix . "pws_eshop_orders_emailed";
-
-			if($wpdb->get_var("show tables like '$table_name'") != $table_name) {
-				$sql = "CREATE TABLE " . $table_name . " (
-					id mediumint(9) NOT NULL AUTO_INCREMENT PRIMARY KEY,
-					eshop_order_id int(11) NOT NULL
-				);";
-				$wpdb->query( $sql );
+		public function daily_summary( ) {
+			$ordersModel = $this->getModel( 'orders' );
+			$summary = $ordersModel->getDailySummary( );
+			$folder = dirname( WP_CONTENT_DIR ) . "/tmp";
+			if ( !file_exists( $folder ) ) mkdir( $folder );
+			$filepath = "$folder/dailysummary.csv";
+			if ( !empty( $summary ) && $this->createCSV( $summary, $filepath ) ) {
+				$recipients = $this->config['plugin_options']['recipients'];
+				$subject = 'Daily Summary';
+				$this->sendEmail( 
+					$recipients, 
+					get_bloginfo( 'admin_email' ), 
+					$subject, 
+					'Daily summary of orders attached.', 
+					$filepath,
+					FALSE	
+				);
+				if ( file_exists( $filepath ) ) unlink( $filepath );
 			}
-		}
-
-		function init( ) {
-			wp_enqueue_style( 'eordem_styles' );
 		}
 	}
 }
 
-// Main
-if ( class_exists( 'eordem_controller' ) ) {
-	$eordem_controller = new eordem_controller( );
+# Go time
 
-	register_activation_hook( __FILE__, array( $eordem_controller, 'activation' ) );
-	register_deactivation_hook( __FILE__, array( $eordem_controller, 'deactivation' ) );
+$main = new $plugin_name( $plugin_name );
 
-	wp_register_style ( 'eordem_styles', '/wp-content/plugins/eshop-order-emailer/css/styles.css' );
-
-	add_action( 'init', array( $eordem_controller, 'init' ) );
-
-	add_action( 'admin_print_styles', array( $eordem_controller, 'init' ) );
-
-	add_action( 'admin_menu', array( $eordem_controller, 'menu' ) );
-	add_action( 'eordem_send', array( $eordem_controller, 'send_email' ) );
-}
 ?>

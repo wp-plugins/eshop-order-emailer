@@ -54,8 +54,9 @@ echo "Exporting the HEAD of master from git to the trunk of SVN"
 git checkout-index -a -f --prefix=$SVNPATH/trunk/
 
 echo "Ignoring github specific files and deployment script"
-svn propset svn:ignore "deploy.sh
+svn propset svn:ignore "svn-deploy.sh
 README.md
+readme.txt
 .git
 .gitignore" "$SVNPATH/trunk/"
 
