@@ -3,7 +3,7 @@
 Plugin Name: eShop Order Emailer
 Plugin URI: http://www.paulswebsolutions.com
 Description: Automatically email eShop orders to your suppliers or a fulfillment center.
-Version: 2.0
+Version: 2.0.1
 Author: Paul's Web Solutions
 Author URI: http://www.paulswebsolutions.com/
 

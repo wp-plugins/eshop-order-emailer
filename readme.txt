@@ -4,7 +4,7 @@ Donate link: http://csv-imp.paulswebsolutions.com
 Tags: eshop, csv, orders, email, fulfillment
 Requires at least: 3.3
 Tested up to: 3.3
-Stable tag: 2.0
+Stable tag: 2.0.1
 
 Email your successful eShop orders to one or more email addresses daily for unlimited suppliers.
 
@@ -35,6 +35,9 @@ No screenshots available.
 = 2.0 =
 * Compatible with Wordpress 3.3+ and eShop 6.2.11
 * Major upgrade of codebase and functionality
+
+= 2.0.1 =
+* Minor bugfix to stop report fields exporting blank
 
 == Upgrade Notice ==
 
