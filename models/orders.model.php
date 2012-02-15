@@ -148,7 +148,7 @@ class ordersModel extends pwsModel_1_0 {
 					list( $k, $v ) = explode( '=', $text );
 					$formatted_row[$k] = $v;
 				} else {
-					$formatted_row[$text] = $row[$name];
+					$formatted_row[$text] = $row[str_replace( ' ', '_', $name )];
 				}
 			}
 		}
