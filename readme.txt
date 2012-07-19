@@ -3,14 +3,16 @@ Contributors: paulswebsolutions
 Donate link: http://csv-imp.paulswebsolutions.com
 Tags: eshop, csv, orders, email, fulfillment
 Requires at least: 3.3
-Tested up to: 3.3
-Stable tag: 2.0.1
+Tested up to: 3.4.1
+Stable tag: 2.1.0
 
 Email your successful eShop orders to one or more email addresses daily for unlimited suppliers.
 
 == Description ==
 
 The purpose of the plugin is to enable email notification of one or more fulfillment centers automatically. You can have as many suppliers as you have products and provide each with all the information needed to fulfill an order. In addition to the fulfillment emails that will be sent out, there is also a summary report which you can mail to yourself to keep tabs on what orders have come in and where they were sent.
+
+As of version 2.1.0, plugin now has 'Instant Mode' for those who prefer speed over efficiency.
 
 == Installation ==
 
@@ -38,6 +40,9 @@ No screenshots available.
 
 = 2.0.1 =
 * Minor bugfix to stop report fields exporting blank
+
+= 2.1.0 =
+* Added 'Instant Mode': Emails will be sent as orders become active (via gateways or when the order is manually changed to active in the orders screen)
 
 == Upgrade Notice ==
 

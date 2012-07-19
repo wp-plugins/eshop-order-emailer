@@ -34,12 +34,14 @@ foreach( array( 'am', 'pm' ) as $ampm ) {
 
 if ( $_SERVER['HTTP_HOST'] == '10.1.1.3' ) {
 	$frequencies = Array(
+		'Instant' => 'instant',
 		'Every 2 Mins (for testing)' => 'two_minutes',
 		'Hourly' => 'hourly',
 		'Every 2 Hours' => 'two_hours',
 	);
 }
 
+$frequencies['Instant'] = 'instant';
 $frequencies['Every 4 Hours'] = 'four_hours';
 $frequencies['Every 12 Hours'] = 'twicedaily';
 $frequencies['Every 24 Hours'] = 'daily';
@@ -55,8 +57,6 @@ foreach( $summary_frequencies as $label => $value ) {
 	$selected = ( $value == $summary_frequency ) ? 'selected' : '';
 	$summary_frequency_options .= "<option value='$value' $selected>$label</option>";
 }
-
-
 
 $current_time = date( 'H:i:s d M Y', strtotime( current_time( 'mysql' ) ) );
 

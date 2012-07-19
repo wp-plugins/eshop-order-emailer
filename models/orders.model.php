@@ -48,14 +48,14 @@ class ordersModel extends pwsModel_1_0 {
 				s2.code as 'ship_state', 
 				c.country as 'country_name', 
 				c2.country as 'ship_country_name', 
-				CONCAT( o.address1, ' ', o.address2, ' ', o.city, ' ', s.code, ' ', o.zip, ' ', c.country ) as 'full_address',
-				CONCAT( o.ship_address, ' ', o.ship_city, ' ', s2.code, ' ', o.ship_postcode, ' ', c2.country ) as 'full_ship_address',
+				CONCAT_WS( ' ', o.address1, o.address2, o.city, s.code, o.state, o.zip, c.country ) as 'full_address',
+				CONCAT_WS( ' ', o.ship_address, o.ship_city, s2.code, o.ship_state, o.ship_postcode, c2.country ) as 'full_ship_address',
 				CONCAT( oi.item_qty, ' x ', oi.optname, ' (', oi.item_id, ')' ) as 'order_items', 
 				oi.optsets  
 			FROM 
 				`$orders_table` o 
 				LEFT JOIN `$order_items_table` oi ON ( o.checkid = oi.checkid ) 
-				LEFT JOIN  `$eshop_states` s ON ( o.state = s.id ) 
+				LEFT JOIN `$eshop_states` s ON ( o.state = s.id ) 
 				LEFT JOIN `$eshop_states` s2 ON ( o.ship_state = s2.id ) 
 				LEFT JOIN `$eshop_countries` c ON ( o.country = c.code ) 
 				LEFT JOIN `$eshop_countries` c2 ON ( o.ship_country = c2.code ) 
@@ -65,7 +65,6 @@ class ordersModel extends pwsModel_1_0 {
 				oi.post_id != 0 AND
 				oi.item_id != 'Shipping'
 			";
-		error_log( $sql );
 		$results = $this->db->get_results( $sql, ARRAY_A );
 		return $results;
 	}
