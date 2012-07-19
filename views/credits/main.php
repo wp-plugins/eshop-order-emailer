@@ -30,9 +30,10 @@ I am a full time freelance web developer and Wordpress specialist.  You can hire
 
 <h4>Special Features</h4>
 <ul class='eordem_list'>
-<li><strong>Multiple Suppliers:</strong> Supplier email addresses are set via a custom field within each product post/page.  The custom field must be called 'supplier_email' and it can either have a single email or multiple email addresses separated by commas. Any product without this custom field will be sent to the default email recipients on the settings page.</li>
+<li><strong>Suppliers:</strong> Supplier email addresses are set via a custom field within each product post/page.  The custom field must be called 'supplier_email' and it can either have a single email or multiple email addresses separated by commas. Any product without this custom field will be sent to the default email recipients on the settings page.</li>
 <li><strong>Custom Display Name:</strong> You can change the default column heading in the CSV file by entering a 'display name' before pressing the 'Add' button.</li>
 <li><strong>Custom Fields:</strong> To add a field not supplied by eShop, you can select the 'Custom' item from the drop down and then enter something like the following into the display name box:  'Custom Column Heading=This Text Will Always Be The Same'.</li>
+<li><strong>Instant Mode (NEW):</strong>If you set 'frequency' to 'instant' then emails will be dispatched whenever status of any order changes to 'Active' (either through a purchase, or via a manual status change in the Orders screen). Suppliers will only be notified the first time status changes to 'Active'.</li>
 </ul>
 
 <h4>Additional Upgrades</h4>

@@ -3,7 +3,7 @@
 Plugin Name: eShop Order Emailer
 Plugin URI: http://www.paulswebsolutions.com
 Description: Automatically email eShop orders to your suppliers or a fulfillment center.
-Version: 2.0.1
+Version: 2.1.0
 Author: Paul's Web Solutions
 Author URI: http://www.paulswebsolutions.com/
 
@@ -61,7 +61,6 @@ if ( !class_exists( $plugin_name ) ) {
 				'frequency' => 'daily',
 				'summary_frequency' => 'daily',
 				'email_subject' => 'Orders From ' . get_bloginfo( 'name' )
-
 			);
 
 			$this->controllerNames = Array(
@@ -96,12 +95,29 @@ if ( !class_exists( $plugin_name ) ) {
 				)
 			);
 
+			# For instant mode
+			if ( $send_emails_frequency == 'instant' ) {
+				unset( $this->cronJobs['notify_suppliers'] );
+				add_action( 'eshop_order_status_updated', Array( $this, 'instant_notify' ), 10, 2 );
+			}
+
 			if ( isset( $_POST[$this->config['constants']['options_key']] ) ) {
 				add_action( 'wp_loaded', Array( $this, 'initCronJobs' ) );
 			}
 			add_action( "{$plugin_name}_notify_suppliers", Array( $this, 'notify_suppliers' ) );
 			add_action( "{$plugin_name}_delete_all", Array( $this, 'delete_all' ) );
+		
+		}
 
+		# With instant mode, this will run every time order status changes and thereby 
+		# notify on each order rather than in bulk.  If multiple orders come in simultaneously, there's
+		# a chance that the orders will be handled together like in normal mode.
+
+		public function instant_notify( $checkid, $status ) {
+
+			if ( $status == 'Completed' ) {
+				$this->notify_suppliers( );
+			}
 		}
 
 		public function activate( ) {
@@ -208,7 +224,6 @@ if ( !class_exists( $plugin_name ) ) {
 		private function createCSV( $data, $filepath ) {
 
 			$csv = new pwsXSV( );
-			//error_log( print_r( $data, TRUE ) );
 			return $csv->save( $data, $filepath, TRUE, TRUE );
 		}
 
