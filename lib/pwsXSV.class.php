@@ -1,5 +1,7 @@
 <?php
 
+if ( ! class_exists( 'pwsXSV' ) ) {
+
 class pwsXSV {
 
 	private $delimiter = ',';
@@ -39,6 +41,8 @@ class pwsXSV {
 			}
 		}
 	}
+
+}
 
 }
 
